@@ -1,7 +1,7 @@
 ---
 title: "Groundwater Quality - Machine Learning Regression"
 author: "Randall Etheridge, Jake Hochard, Ariane Peralta, Tom Vogel"
-Credits: "Much of this script was adapted from Rebecca Barter at http://www.rebeccabarter.com/blog/2020-03-25_machine_learning/"
+credits: "Much of this script was adapted from Rebecca Barter at http://www.rebeccabarter.com/blog/2020-03-25_machine_learning/"
 ---
 
 # Set working directory
@@ -16,9 +16,9 @@ library("tune")
 library("doFuture")
 library("doRNG")
 
-set.seed(123) #set seed for repeatability
+set.seed(123) # set seed for repeatability
 
-#set up for parallel processing
+# set up for parallel processing
 registerDoFuture()
 plan(multisession, gc = TRUE)
 
@@ -42,7 +42,8 @@ dim(master)
 #  filter(sa == "C") %>% #"SA" for animal production area; "C" for control
 #  select(-region, -sa)
 
-commast$nitrate[commast$nitrate == 0] <- 0.5 # Replace nitrate non-detects with 0.5 mg/L
+# replace nitrate non-detects with 0.5 mg/L
+commast$nitrate[commast$nitrate == 0] <- 0.5
 
 registerDoRNG(123) # set seed for reproducibility
 
@@ -124,4 +125,4 @@ ranger_obj <- pull_workflow_fit(final_model)$fit
 ranger_obj
 
 df <- as.data.frame(ranger_obj$variable.importance)
-write.csv(df, "ML_C_082321.csv")
+write.csv(df, "name.csv")
