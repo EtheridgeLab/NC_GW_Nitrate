@@ -1,12 +1,14 @@
 ---
 title: "Groundwater Quality - Machine Learning Regression"
 author: "Randall Etheridge, Jake Hochard, Ariane Peralta, Tom Vogel"
+Credits: "Much of this script was adapted from Rebecca Barter at http://www.rebeccabarter.com/blog/2020-03-25_machine_learning/"
 ---
 
-#PC - set WD manually by Session -> Set Working Directory -> Choose Directory...
+# Set working directory
+# PC - set WD manually by Session -> Set Working Directory -> Choose Directory...
 setwd("/") #Add the path for your PC here
 
-#load req'd packages
+# load req'd packages
 library("tidymodels")
 library("tidyverse")
 library("workflows")
@@ -20,30 +22,30 @@ set.seed(123) #set seed for repeatability
 registerDoFuture()
 plan(multisession, gc = TRUE)
 
-#load data file 
+# load data file 
 master <- read_csv("NO3_precip_temp_region_SA.csv")
 dim(master)
 
-#Remove #'s in one of the next three sections to determine which region to develop models for
+# Remove #'s in one of the next three sections to determine which region to develop models for
 
-#use the whole state
+# use the whole state
 #commast <- master %>%
 #  select(-region, -sa)
 
-#choose region
+# choose region
 #commast <- master %>%
 #  filter(region == "M") %>%  #"CP" for Coastal Plain; "P" for Piedmont; "M" for Mountains
 #  select(-region, -sa)
 
-#choose SA
+# choose smaller study area
 #commast <- master %>%
 #  filter(sa == "C") %>% #"SA" for animal production area; "C" for control
 #  select(-region, -sa)
 
-commast$nitrate[commast$nitrate == 0] <- 0.5
-#commast$nitrate <- log(commast$nitrate)
+commast$nitrate[commast$nitrate == 0] <- 0.5 # Replace nitrate non-detects with 0.5 mg/L
 
-registerDoRNG(123)
+registerDoRNG(123) # set seed for reproducibility
+
 # split the data into training (80%) and testing (20%)
 commast_split <- initial_split(commast,prop = 4/5)
 
@@ -54,16 +56,14 @@ commast_test <- testing(commast_split)
 # create CV object from training data
 commast_cv <- vfold_cv(commast_train, v = 5)
 
-# Define a recipe http://www.rebeccabarter.com/blog/2020-03-25_machine_learning/
+# Define a recipe, which consists of the formula (outcome ~ predictors)
 ml_recipe <-
-  #which consists of the formula (outcome ~ predictors)
   recipe(nitrate ~ ., data = commast) %>%
   step_normalize(all_predictors())
 
 #Specify the model
 rf_model <- 
   # specify that the model is a random forest
-  # https://www.rdocumentation.org/packages/parsnip/versions/0.0.0.9001/topics/rand_forest
   rand_forest() %>%
   set_args(mtry = tune(),trees = tune()) %>%
   # select the engine/package that underlies the model
@@ -78,30 +78,31 @@ rf_workflow <- workflow() %>%
   # add the model
   add_model(rf_model)
 
-# specify which values want to try
+# specify which parameter values you want to try for tuning the model
 rf_grid <- expand.grid(mtry = c(1, 2, 3), trees = c(500, 750, 1000, 1250, 1500, 1750, 2000, 2250, 2500))
 
 # extract results
-registerDoRNG(123)
-start_time <- Sys.time()
+registerDoRNG(123) # set seed for reproducibility
+start_time <- Sys.time() # time recorded determine time required to develop models
 rf_tune_results <- rf_workflow %>%
   tune_grid(resamples = commast_cv, #CV object
-            grid = rf_grid, # grid of values to try
-            metrics = metric_set(rmse, rsq) # metrics we care about
+            grid = rf_grid, # grid of paramter values to try
+            metrics = metric_set(rmse, rsq) # model metrics we care about
   )
 
-end_time <- Sys.time()
+end_time <- Sys.time() # time recorded determine time required to develop models
 
 # print results
 met <- rf_tune_results %>%
   collect_metrics()
 
-end_time - start_time
+end_time - start_time # time required to develop models
 
-autoplot(rf_tune_results, metric = "rmse")
-autoplot(rf_tune_results, metric = "rsq")
+autoplot(rf_tune_results, metric = "rmse") # plot results with Root Mean Square Error
+autoplot(rf_tune_results, metric = "rsq") # plot results with R^2
 
 param_final <- rf_tune_results %>%
+  # select model based on best R^2
   select_best(metric = "rsq")
 param_final
 
@@ -109,17 +110,14 @@ rf_workflow <- rf_workflow %>%
   finalize_workflow(param_final)
 
 rf_fit <- rf_workflow %>%
-  # fit on the training set and evaluate on test set
+  # fit best model on the training set and evaluate on test set
   last_fit(commast_split, metrics = metric_set(rmse, rsq))
 rf_fit
 
 test_performance <- rf_fit %>% collect_metrics()
-test_performance
+test_performance # view performance on test set
 
-# generate predictions from the test set
-test_predictions <- rf_fit %>% collect_predictions()
-test_predictions
-
+# extract variable importance from model and save to csv file
 final_model <- fit(rf_workflow, commast)
 
 ranger_obj <- pull_workflow_fit(final_model)$fit
