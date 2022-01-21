@@ -3,7 +3,9 @@
 
 This repository contains open-source code & text files.  This information will be archived when it is published.
 
-Data used for this project is archived here: *not currently available*
+Data used for this project is archived here: [https://doi.org/10.15139/S3/QPYLYZ](https://doi.org/10.15139/S3/QPYLYZ)
+
+
 
 ## We address the following objective:
 
